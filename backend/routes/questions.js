@@ -110,7 +110,7 @@ router.get('/:id/suggest', authenticateToken, authorizeRole(['md']), async (req,
 // 3. POST Reply to a Question (MD action)
 router.post('/:id/reply', authenticateToken, authorizeRole(['md']), async (req, res) => {
   const { id } = req.params;
-  const { answer } = req.body;
+  const { answer, addToKb } = req.body;
 
   if (!answer || answer.trim() === '') {
     return res.status(400).json({ error: 'Answer cannot be empty' });
@@ -156,11 +156,12 @@ router.post('/:id/reply', authenticateToken, authorizeRole(['md']), async (req, 
       `Your question "${question.question_normalized.substring(0, 40)}..." has been answered by the MD.`
     );
 
-    // 5. Update RAG Knowledge Base asynchronously
-    // Using original (or normalized) question and MD answer
-    addQuestionToKnowledgeBase(question.question_normalized, answer)
-      .then(() => console.log('Successfully added answered question to Knowledge Base (RAG)'))
-      .catch((e) => console.error('Failed to index answered question to RAG:', e.message));
+    // 5. Update RAG Knowledge Base asynchronously if requested
+    if (addToKb) {
+      addQuestionToKnowledgeBase(question.question_normalized, answer)
+        .then(() => console.log('Successfully added answered question to Knowledge Base (RAG)'))
+        .catch((e) => console.error('Failed to index answered question to RAG:', e.message));
+    }
 
     // Emit live socket event to notify other clients about queue resolution
     if (io) {

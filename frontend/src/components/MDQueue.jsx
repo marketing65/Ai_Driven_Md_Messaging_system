@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, Filter, MessageSquare, Send, CheckCircle2, User, AlertCircle, Zap, Mic, Paperclip } from 'lucide-react';
+import { Search, Filter, MessageSquare, Send, CheckCircle2, User, AlertCircle, Zap, Mic, Paperclip, Sparkles } from 'lucide-react';
 import { io } from 'socket.io-client';
 import FileViewerModal from './FileViewerModal';
 
@@ -238,8 +238,7 @@ export default function MDQueue({ user, backendUrl, token }) {
   };
 
   // Submit Answer
-  const handleSubmitReply = async (e) => {
-    e.preventDefault();
+  const handleSubmitReply = async (addToKb = false) => {
     if (!replyText.trim() || !activeQuestion) return;
 
     setSubmittingReply(true);
@@ -250,7 +249,7 @@ export default function MDQueue({ user, backendUrl, token }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ answer: replyText })
+        body: JSON.stringify({ answer: replyText, addToKb })
       });
 
       if (res.ok) {
@@ -427,7 +426,7 @@ export default function MDQueue({ user, backendUrl, token }) {
               )}
             </div>
 
-            <form onSubmit={handleSubmitReply} className="reply-form">
+            <form onSubmit={(e) => { e.preventDefault(); handleSubmitReply(false); }} className="reply-form">
               <div className="textarea-wrapper" style={{ position: 'relative' }}>
                 <textarea
                   className="input-field reply-textarea"
@@ -478,6 +477,16 @@ export default function MDQueue({ user, backendUrl, token }) {
                 >
                   <Send size={14} />
                   <span>{submittingReply ? 'Sending...' : 'Mark Answered'}</span>
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-success"
+                  style={{ backgroundColor: '#10b981', borderColor: '#10b981', color: '#fff', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  disabled={!replyText.trim() || submittingReply}
+                  onClick={() => handleSubmitReply(true)}
+                >
+                  <Sparkles size={14} />
+                  <span>Send & Add to KB</span>
                 </button>
               </div>
             </form>
