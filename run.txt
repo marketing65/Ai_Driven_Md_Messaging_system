@@ -1,0 +1,7 @@
+Run both Frontend and Backend concurrently with a single command:
+
+1. Open your terminal in the root directory:
+   cd "c:\Users\welcome\Documents\Ai Driven Messaging System"
+
+2. Run the start command:
+   npm run dev
