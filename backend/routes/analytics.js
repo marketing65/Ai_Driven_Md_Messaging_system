@@ -170,9 +170,6 @@ router.get('/search', authenticateToken, async (req, res) => {
       const kbAll = await query(
         'SELECT id, question, answer, created_at FROM knowledge_base ORDER BY created_at DESC'
       );
-      const qAll = await query(
-        'SELECT id, question_original, answer, created_at FROM questions WHERE status = \'answered\' ORDER BY created_at DESC'
-      );
 
       const kbRows = (kbAll.rows ?? []).map(r => ({
         id: r.id,
@@ -182,28 +179,13 @@ router.get('/search', authenticateToken, async (req, res) => {
         source: 'knowledge_base'
       }));
 
-      const qRows = (qAll.rows ?? []).map(r => ({
-        id: r.id,
-        question: r.question_original,
-        answer: r.answer,
-        created_at: r.created_at,
-        source: 'question'
-      }));
-
-      const combined = [...kbRows, ...qRows].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-      return res.json(combined);
+      return res.json(kbRows);
     }
     const term = `%${q}%`;
     
     // Search knowledge base
     const kbSearch = await query(
-      'SELECT id, question, answer, created_at FROM knowledge_base WHERE question LIKE $1 OR answer LIKE $1 LIMIT 5',
-      [term]
-    );
-
-    // Search past questions
-    const qSearch = await query(
-      'SELECT id, question_original, answer, created_at FROM questions WHERE (question_original LIKE $1 OR answer LIKE $1) AND status = \'answered\' LIMIT 5',
+      'SELECT id, question, answer, created_at FROM knowledge_base WHERE question LIKE $1 OR answer LIKE $1 LIMIT 10',
       [term]
     );
 
@@ -215,16 +197,7 @@ router.get('/search', authenticateToken, async (req, res) => {
       source: 'knowledge_base'
     }));
 
-    const qRows = (qSearch.rows ?? []).map(r => ({
-      id: r.id,
-      question: r.question_original,
-      answer: r.answer,
-      created_at: r.created_at,
-      source: 'question'
-    }));
-
-    const combined = [...kbRows, ...qRows];
-    res.json(combined);
+    res.json(kbRows);
   } catch (err) {
     console.error('Search error:', err.message);
     res.status(500).json({ error: 'Search failed' });
