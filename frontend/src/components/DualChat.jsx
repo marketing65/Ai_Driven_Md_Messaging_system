@@ -1305,6 +1305,22 @@ export default function DualChat({ user, backendUrl, token }) {
           position: relative;
         }
 
+        .chat-pane::before {
+          content: "";
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-image: url("/logo.png");
+          background-repeat: no-repeat;
+          background-position: center;
+          background-size: 280px; /* adjusted watermark size */
+          opacity: 0.05; /* light opacity for subtle watermark look */
+          pointer-events: none; /* allows clicking through the watermark */
+          z-index: 0;
+        }
+
         .ai-chat-pane {
           background-color: var(--bg-secondary);
         }
@@ -1400,6 +1416,8 @@ export default function DualChat({ user, backendUrl, token }) {
           display: flex;
           flex-direction: column;
           gap: 20px;
+          position: relative;
+          z-index: 1;
         }
 
         .chat-welcome-state {
@@ -1412,6 +1430,8 @@ export default function DualChat({ user, backendUrl, token }) {
           max-width: 340px;
           margin: 0 auto;
           animation: fadeIn 0.5s ease;
+          position: relative;
+          z-index: 1;
         }
 
         .welcome-icon {
