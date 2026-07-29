@@ -160,13 +160,16 @@ export default function Dashboard({ setActiveTab, user, backendUrl, token }) {
       <div className="dashboard-grid">
         <div className="left-cards-panel">
           
-          {/* Reverted two cards: Ask AI and Ask MD */}
           <div className="action-cards-row">
             {/* Ask AI Card */}
             <div className="action-card ai-gradient-card">
               <div className="card-content-left">
                 <h2>Ask AI</h2>
-                <p>Get instant answers from AI based on MD's knowledge base.</p>
+                <p>
+                  {user?.role === 'md'
+                    ? "Get instant answers from AI based on your knowledge base."
+                    : "Get instant answers from AI based on MD's knowledge base."}
+                </p>
                 <button className="btn btn-primary action-btn" onClick={() => setActiveTab('chat')}>
                   <span>Ask AI Now</span>
                   <ArrowRight size={16} />
@@ -179,22 +182,41 @@ export default function Dashboard({ setActiveTab, user, backendUrl, token }) {
               </div>
             </div>
 
-            {/* Ask MD Card */}
+            {/* Ask MD or Employee Queries Card */}
             <div className="action-card md-gradient-card">
               <div className="card-content-left">
-                <h2>Ask MD</h2>
-                <p>Can't find the answer? Ask MD directly for verified expert help.</p>
-                <button className="btn btn-secondary action-btn" onClick={() => setActiveTab('chat')}>
-                  <span>Ask MD Now</span>
-                  <ArrowRight size={16} />
-                </button>
+                {user?.role === 'md' ? (
+                  <>
+                    <h2>Employee Queries</h2>
+                    <p>Manage and respond to pending questions raised by your employees.</p>
+                    <button className="btn btn-secondary action-btn" onClick={() => setActiveTab('queue')}>
+                      <span>View Queries</span>
+                      <ArrowRight size={16} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <h2>Ask MD</h2>
+                    <p>Can't find the answer? Ask MD directly for verified expert help.</p>
+                    <button className="btn btn-secondary action-btn" onClick={() => setActiveTab('chat')}>
+                      <span>Ask MD Now</span>
+                      <ArrowRight size={16} />
+                    </button>
+                  </>
+                )}
               </div>
               <div className="card-illustration">
-                <img 
-                  src="/md-avatar.png" 
-                  alt="Managing Director" 
-                  className="md-avatar-dashboard" 
-                />
+                {user?.role === 'md' ? (
+                  <div className="bot-sphere" style={{ background: 'linear-gradient(135deg, rgba(245, 133, 51, 0.2), rgba(239, 68, 68, 0.2))' }}>
+                    <Users size={54} style={{ color: 'var(--primary-color)' }} />
+                  </div>
+                ) : (
+                  <img 
+                    src="/md-avatar.png" 
+                    alt="Managing Director" 
+                    className="md-avatar-dashboard" 
+                  />
+                )}
               </div>
             </div>
           </div>
