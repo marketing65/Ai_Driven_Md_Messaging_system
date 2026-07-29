@@ -496,23 +496,35 @@ async function ensureScheduledMessagesTable() {
   try {
     await client.connect();
     
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS scheduled_messages (
-        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        chat_id    VARCHAR(100) NOT NULL,
-        sender     VARCHAR(20)  NOT NULL CHECK (sender IN ('employee', 'md')),
-        message    TEXT NOT NULL,
-        send_at    TIMESTAMP WITH TIME ZONE NOT NULL,
-        sent       BOOLEAN NOT NULL DEFAULT FALSE,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    const tableExistsRes = await client.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE  table_schema = 'public'
+        AND    table_name   = 'scheduled_messages'
       );
     `);
     
-    await client.query(`
-      ALTER TABLE scheduled_messages ENABLE ROW LEVEL SECURITY;
-    `);
-    
-    // Insecure allow_all policies removed. Security is managed via fix-supabase-security.sql RLS policies.
+    if (!tableExistsRes.rows[0].exists) {
+      await client.query(`
+        CREATE TABLE scheduled_messages (
+          id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          chat_id    VARCHAR(100) NOT NULL,
+          sender     VARCHAR(20)  NOT NULL CHECK (sender IN ('employee', 'md')),
+          message    TEXT NOT NULL,
+          send_at    TIMESTAMP WITH TIME ZONE NOT NULL,
+          sent       BOOLEAN NOT NULL DEFAULT FALSE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      
+      try {
+        await client.query(`
+          ALTER TABLE scheduled_messages ENABLE ROW LEVEL SECURITY;
+        `);
+      } catch (rlsErr) {
+        console.warn('[DB] Could not enable RLS on scheduled_messages (might require superuser/owner):', rlsErr.message);
+      }
+    }
     
     console.log('[DB] ✓ scheduled_messages table ensured');
   } catch (err) {
@@ -534,19 +546,31 @@ async function ensureAllowedEmailsTable() {
   try {
     await client.connect();
     
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS allowed_emails (
-        id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        email      VARCHAR(255) UNIQUE NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    const tableExistsRes = await client.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE  table_schema = 'public'
+        AND    table_name   = 'allowed_emails'
       );
     `);
     
-    await client.query(`
-      ALTER TABLE allowed_emails ENABLE ROW LEVEL SECURITY;
-    `);
-    
-    // Insecure allow_all policies removed. Security is managed via fix-supabase-security.sql RLS policies.
+    if (!tableExistsRes.rows[0].exists) {
+      await client.query(`
+        CREATE TABLE allowed_emails (
+          id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+          email      VARCHAR(255) UNIQUE NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
+      
+      try {
+        await client.query(`
+          ALTER TABLE allowed_emails ENABLE ROW LEVEL SECURITY;
+        `);
+      } catch (rlsErr) {
+        console.warn('[DB] Could not enable RLS on allowed_emails (might require superuser/owner):', rlsErr.message);
+      }
+    }
     
     // Seed default whitelisted emails if the table is completely empty
     const checkRes = await client.query("SELECT COUNT(*) FROM allowed_emails");

@@ -126,11 +126,16 @@ router.get('/summary', authenticateToken, async (req, res) => {
 
     leaderboard.sort((a, b) => b.score - a.score);
 
-    // 6. Recent AI Solutions Log (Preceding employee message + AI answer)
-    const recentMsgsRes = await query(
-      "SELECT chat_id, sender, message, created_at FROM messages WHERE sender IN ('employee', 'ai') ORDER BY created_at DESC LIMIT 30"
-    );
-    const msgList = recentMsgsRes.rows || [];
+    // 6. Recent AI Solutions Log (Preceding employee message + AI answer) using direct Supabase client
+    const { data: msgListRaw, error: msgError } = await supabase
+      .from('messages')
+      .select('chat_id, sender, message, created_at')
+      .in('sender', ['employee', 'ai'])
+      .order('created_at', { ascending: false })
+      .limit(30);
+
+    if (msgError) throw msgError;
+    const msgList = msgListRaw || [];
     const aiSolutions = [];
     for (let i = 0; i < msgList.length - 1; i++) {
       if (msgList[i].sender === 'ai' && msgList[i+1].sender === 'employee' && msgList[i].chat_id === msgList[i+1].chat_id) {

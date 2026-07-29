@@ -28,6 +28,7 @@ dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 
 // Safe CORS Origins Configuration
