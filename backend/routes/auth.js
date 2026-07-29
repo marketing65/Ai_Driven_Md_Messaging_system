@@ -207,7 +207,7 @@ router.get('/me', authenticateToken, async (req, res) => {
     // req.user is set by middleware — may have auth_id-based profile or metadata fallback
     const { data: profile, error } = await supabaseAdmin
       .from('users')
-      .select('id, role, name, email, avatar_url, created_at')
+      .select('id, role, name, email, created_at')
       .or(`id.eq.${req.user.id},auth_id.eq.${req.user.id}`)
       .limit(1)
       .single();
@@ -234,7 +234,7 @@ router.get('/employees', authenticateToken, async (req, res) => {
   try {
     const { data: employees, error } = await supabaseAdmin
       .from('users')
-      .select('id, name, email, avatar_url')
+      .select('id, name, email')
       .eq('role', 'employee');
       
     if (error) throw error;
@@ -250,7 +250,7 @@ router.get('/md-profile', authenticateToken, async (req, res) => {
   try {
     const { data: mdProfile, error } = await supabaseAdmin
       .from('users')
-      .select('id, name, email, avatar_url')
+      .select('id, name, email')
       .eq('role', 'md')
       .limit(1)
       .maybeSingle();
