@@ -12,6 +12,10 @@ import { supabase } from '../config/db.js';
 import { authenticateToken } from '../middleware/auth.js';
 import dotenv from 'dotenv';
 import nodemailer from 'nodemailer';
+import multer from 'multer';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 dotenv.config();
 
 const router = express.Router();
@@ -141,7 +145,7 @@ router.post('/login', async (req, res) => {
     // Fetch role/name from public.users profile
     const { data: profile } = await supabaseAdmin
       .from('users')
-      .select('id, role, name, email')
+      .select('id, role, name, email, avatar_url')
       .eq('auth_id', data.user.id)
       .single();
 
@@ -150,6 +154,7 @@ router.post('/login', async (req, res) => {
       role:  data.user.user_metadata?.role  || 'employee',
       name:  data.user.user_metadata?.name  || email,
       email: data.user.email,
+      avatar_url: null,
     };
 
     console.log(`[Auth] Login: ${email} (${userProfile.role})`);
@@ -202,7 +207,7 @@ router.get('/me', authenticateToken, async (req, res) => {
     // req.user is set by middleware — may have auth_id-based profile or metadata fallback
     const { data: profile, error } = await supabaseAdmin
       .from('users')
-      .select('id, role, name, email, created_at')
+      .select('id, role, name, email, avatar_url, created_at')
       .or(`id.eq.${req.user.id},auth_id.eq.${req.user.id}`)
       .limit(1)
       .single();
@@ -229,7 +234,7 @@ router.get('/employees', authenticateToken, async (req, res) => {
   try {
     const { data: employees, error } = await supabaseAdmin
       .from('users')
-      .select('id, name, email')
+      .select('id, name, email, avatar_url')
       .eq('role', 'employee');
       
     if (error) throw error;
@@ -237,6 +242,24 @@ router.get('/employees', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('[Auth] Fetch employees error:', err.message);
     res.status(500).json({ error: 'Failed to retrieve employees list' });
+  }
+});
+
+// ── GET /api/auth/md-profile ──────────────────────────────────────
+router.get('/md-profile', authenticateToken, async (req, res) => {
+  try {
+    const { data: mdProfile, error } = await supabaseAdmin
+      .from('users')
+      .select('id, name, email, avatar_url')
+      .eq('role', 'md')
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw error;
+    res.json(mdProfile || { name: 'Managing Director', avatar_url: null });
+  } catch (err) {
+    console.error('[Auth] Fetch MD profile error:', err.message);
+    res.status(500).json({ error: 'Failed to retrieve MD profile' });
   }
 });
 
@@ -488,6 +511,109 @@ router.delete('/allowed-emails/:id', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('[Auth] Delete allowed-email error:', err.message);
     res.status(500).json({ error: 'Failed to remove email from whitelist' });
+  }
+});
+
+// Multer storage setup for avatar uploads
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const uploadDir = path.resolve(__dirname, '../uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const avatarStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    cb(null, `avatar-${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`);
+  }
+});
+const uploadAvatar = multer({ 
+  storage: avatarStorage,
+  limits: { fileSize: 5242880 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+    if (extname && mimetype) {
+      return cb(null, true);
+    }
+    cb(new Error('Only images (jpg, png, gif, webp) are allowed'));
+  }
+});
+
+// ── POST /api/auth/profile/avatar ─────────────────────────────────
+router.post('/profile/avatar', authenticateToken, uploadAvatar.single('avatar'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Avatar image file is required' });
+  }
+
+  const tempFilePath = req.file.path;
+  const userId = req.user.id;
+
+  try {
+    const fileBuffer = fs.readFileSync(tempFilePath);
+    const bucketName = 'avatars';
+
+    // Ensure bucket exists in Supabase Storage
+    const { data: buckets, error: listError } = await supabaseAdmin.storage.listBuckets();
+    if (listError) {
+      console.error('[Supabase Storage] List buckets error:', listError.message);
+    }
+    const bucketExists = buckets?.some(b => b.name === bucketName);
+    if (!bucketExists) {
+      console.log(`[Supabase Storage] Creating public bucket: "${bucketName}"`);
+      const { error: createError } = await supabaseAdmin.storage.createBucket(bucketName, {
+        public: true,
+        fileSizeLimit: 5242880 // 5MB
+      });
+      if (createError) {
+        console.error('[Supabase Storage] Bucket creation error:', createError.message);
+      }
+    }
+
+    // Upload file buffer to Supabase Storage
+    const uniqueFilename = `${userId}-${Date.now()}${path.extname(req.file.originalname)}`;
+    const { error: uploadError } = await supabaseAdmin.storage
+      .from(bucketName)
+      .upload(uniqueFilename, fileBuffer, {
+        contentType: req.file.mimetype,
+        duplex: 'half',
+        upsert: true
+      });
+
+    if (uploadError) {
+      throw uploadError;
+    }
+
+    // Get public URL of the uploaded asset
+    const { data: urlData } = supabaseAdmin.storage.from(bucketName).getPublicUrl(uniqueFilename);
+    const publicUrl = urlData.publicUrl;
+
+    // Delete local temporary file
+    if (fs.existsSync(tempFilePath)) {
+      fs.unlinkSync(tempFilePath);
+    }
+
+    // Update the avatar_url in the users table
+    const { error: updateError } = await supabaseAdmin
+      .from('users')
+      .update({ avatar_url: publicUrl })
+      .or(`id.eq.${userId},auth_id.eq.${userId}`);
+
+    if (updateError) throw updateError;
+
+    res.json({
+      message: 'Avatar uploaded and profile updated successfully',
+      avatarUrl: publicUrl
+    });
+  } catch (err) {
+    console.error('[Supabase Storage] Avatar upload error:', err.message);
+    // Cleanup temporary file in case of failure
+    if (fs.existsSync(tempFilePath)) {
+      fs.unlinkSync(tempFilePath);
+    }
+    res.status(500).json({ error: `Avatar upload failed: ${err.message}` });
   }
 });
 

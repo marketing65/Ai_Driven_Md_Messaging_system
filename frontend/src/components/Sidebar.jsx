@@ -73,7 +73,9 @@ export default function Sidebar({
       <div className="sidebar-footer">
         <div className="user-profile-card">
           <div className="user-avatar" style={{ overflow: 'hidden' }}>
-            {user?.role === 'md' ? (
+            {user?.avatar_url ? (
+              <img src={user.avatar_url} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : user?.role === 'md' ? (
               <img src="/md-avatar.png" alt="MD" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             ) : (
               user?.name?.charAt(0) || 'U'

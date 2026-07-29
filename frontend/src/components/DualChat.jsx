@@ -93,6 +93,7 @@ export default function DualChat({ user, backendUrl, token }) {
 
   // Bidirectional MD-to-Employee Messaging States
   const [employees, setEmployees] = useState([]);
+  const [mdProfile, setMdProfile] = useState(null);
   const [sentToMdIndexes, setSentToMdIndexes] = useState(new Set());
 
   // Scheduled Messages States
@@ -242,19 +243,30 @@ export default function DualChat({ user, backendUrl, token }) {
     document.body.style.userSelect = 'none';
   };
 
-  // Fetch employees if user is MD
+  // Fetch profiles for avatar mapping
   useEffect(() => {
-    if (user.role === 'md') {
-      fetch(`${backendUrl}/api/auth/employees`, {
+    fetch(`${backendUrl}/api/auth/employees`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setEmployees(data);
+        }
+      })
+      .catch(err => console.error('Error fetching employees:', err));
+
+    if (user.role === 'employee') {
+      fetch(`${backendUrl}/api/auth/md-profile`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
         .then(res => res.json())
         .then(data => {
-          if (Array.isArray(data)) {
-            setEmployees(data);
+          if (data) {
+            setMdProfile(data);
           }
         })
-        .catch(err => console.error('Error fetching employees:', err));
+        .catch(err => console.error('Error fetching MD profile:', err));
     }
   }, [user.role, backendUrl, token]);
 
@@ -908,8 +920,16 @@ export default function DualChat({ user, backendUrl, token }) {
           ) : (
             aiHistory.map((msg, index) => (
               <div key={index} className={`message-bubble-row ${msg.sender}`}>
-                <div className="msg-avatar">
-                  {msg.sender === 'employee' ? <User size={16} /> : <Bot size={16} />}
+                <div className="msg-avatar" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {msg.sender === 'employee' ? (
+                    user.avatar_url ? (
+                      <img src={user.avatar_url} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <User size={16} />
+                    )
+                  ) : (
+                    <Bot size={16} />
+                  )}
                 </div>
                 <div className="msg-bubble-content">
                   <div className="msg-bubble-text">
@@ -1008,11 +1028,35 @@ export default function DualChat({ user, backendUrl, token }) {
       <div className="chat-pane md-chat-pane" style={{ flexGrow: 1, flexShrink: 1, width: 0 }}>
         <div className="chat-pane-header">
           <div className="header-meta">
-            <div className="md-avatar-wrapper">
-              <img src="/md-avatar.png" alt="MD" className="md-avatar-circle" />
+            <div className="md-avatar-wrapper" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {user.role === 'md' ? (
+                (() => {
+                  const activeEmployee = employees.find(emp => emp.id === recipient);
+                  return activeEmployee?.avatar_url ? (
+                    <img src={activeEmployee.avatar_url} alt="Employee" className="md-avatar-circle" />
+                  ) : (
+                    <Users size={20} />
+                  );
+                })()
+              ) : (
+                mdProfile?.avatar_url ? (
+                  <img src={mdProfile.avatar_url} alt="MD" className="md-avatar-circle" />
+                ) : (
+                  <img src="/md-avatar.png" alt="MD" className="md-avatar-circle" />
+                )
+              )}
             </div>
             <div>
-              <h3>{user.role === 'md' ? 'Ask Employees' : 'Ask MD'}</h3>
+              <h3>
+                {user.role === 'md' ? (
+                  (() => {
+                    const activeEmployee = employees.find(emp => emp.id === recipient);
+                    return activeEmployee ? activeEmployee.name : 'Ask Employees';
+                  })()
+                ) : (
+                  mdProfile?.name || 'Ask MD'
+                )}
+              </h3>
               <div className="status-indicator-row">
                 <span className="dot pending-dot"></span>
                 <span className="status-text">
@@ -1115,11 +1159,33 @@ export default function DualChat({ user, backendUrl, token }) {
               ) : (
                 threadHistory.map((msg, index) => (
                   <div key={index} className={`message-bubble-row ${msg.sender}`}>
-                    <div className="msg-avatar">
+                    <div className="msg-avatar" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {msg.message.startsWith('Managing Director') ? (
-                        <img src="/md-avatar.png" alt="MD" className="md-avatar-mini" />
+                        user.role === 'md' ? (
+                          user.avatar_url ? (
+                            <img src={user.avatar_url} alt="MD" className="md-avatar-mini" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <img src="/md-avatar.png" alt="MD" className="md-avatar-mini" />
+                          )
+                        ) : (
+                          mdProfile?.avatar_url ? (
+                            <img src={mdProfile.avatar_url} alt="MD" className="md-avatar-mini" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <img src="/md-avatar.png" alt="MD" className="md-avatar-mini" />
+                          )
+                        )
                       ) : (
-                        <User size={16} />
+                        (() => {
+                          const prefixIndex = msg.message.indexOf(': ');
+                          if (prefixIndex !== -1) {
+                            const senderName = msg.message.substring(0, prefixIndex);
+                            const senderEmp = employees.find(emp => emp.name === senderName);
+                            if (senderEmp?.avatar_url) {
+                              return <img src={senderEmp.avatar_url} alt={senderName} className="md-avatar-mini" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />;
+                            }
+                          }
+                          return <User size={16} />;
+                        })()
                       )}
                     </div>
                     <div className="msg-bubble-content">
@@ -1323,11 +1389,38 @@ export default function DualChat({ user, backendUrl, token }) {
                 ) : (
                   mdHistory.map((msg, index) => (
                     <div key={index} className={`message-bubble-row ${msg.sender}`}>
-                      <div className="msg-avatar">
+                      <div className="msg-avatar" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         {msg.sender === 'md' ? (
-                          <img src="/md-avatar.png" alt="MD" className="md-avatar-mini" />
+                          user.role === 'md' ? (
+                            user.avatar_url ? (
+                              <img src={user.avatar_url} alt="MD" className="md-avatar-mini" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <img src="/md-avatar.png" alt="MD" className="md-avatar-mini" />
+                            )
+                          ) : (
+                            mdProfile?.avatar_url ? (
+                              <img src={mdProfile.avatar_url} alt="MD" className="md-avatar-mini" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <img src="/md-avatar.png" alt="MD" className="md-avatar-mini" />
+                            )
+                          )
                         ) : (
-                          <User size={16} />
+                          user.role === 'md' ? (
+                            (() => {
+                              const activeEmployee = employees.find(emp => emp.id === recipient);
+                              return activeEmployee?.avatar_url ? (
+                                <img src={activeEmployee.avatar_url} alt="Employee" className="md-avatar-mini" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                <User size={16} />
+                              );
+                            })()
+                          ) : (
+                            user.avatar_url ? (
+                              <img src={user.avatar_url} alt="Employee" className="md-avatar-mini" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <User size={16} />
+                            )
+                          )
                         )}
                       </div>
                       <div className="msg-bubble-content">

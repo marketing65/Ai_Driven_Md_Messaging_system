@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, Search, Sun, Moon, CheckCheck, User, Sparkles, ShieldCheck } from 'lucide-react';
+import { Bell, Search, Sun, Moon, CheckCheck, User, Sparkles, ShieldCheck, Camera, Upload, AlertCircle } from 'lucide-react';
 import { io } from 'socket.io-client';
 import supabase from './lib/supabase.js';
 
@@ -1483,8 +1483,16 @@ export default function App() {
             </div>
 
             {/* User Profile display */}
-            <div className="top-profile-badge">
-              <User size={16} />
+            <div className="top-profile-badge" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 12px' }}>
+              {user.avatar_url ? (
+                <img 
+                  src={user.avatar_url} 
+                  alt="Profile" 
+                  style={{ width: '20px', height: '20px', borderRadius: '50%', objectFit: 'cover' }} 
+                />
+              ) : (
+                <User size={16} />
+              )}
               <span>{user.name}</span>
             </div>
           </div>
@@ -1521,7 +1529,7 @@ export default function App() {
           </div>
           
           <div style={{ display: activeTab === 'settings' ? 'contents' : 'none' }}>
-            <SettingsView user={user} onLogout={handleLogout} />
+            <SettingsView user={user} onLogout={handleLogout} token={token} backendUrl={BACKEND_URL} onUserUpdate={(updatedUser) => setUser(updatedUser)} />
           </div>
         </div>
       </main>
@@ -1697,38 +1705,227 @@ export default function App() {
 }
 
 // Local Inline Settings View
-function SettingsView({ user, onLogout }) {
+function SettingsView({ user, onLogout, token, backendUrl, onUserUpdate }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const fileInputRef = useRef(null);
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setError('');
+    setSuccess('');
+
+    // 1. Validation
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      setError('Invalid file type. Please upload jpeg, jpg, png, gif, or webp.');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setError('File size too large. Maximum size is 5MB.');
+      return;
+    }
+
+    // 2. Upload
+    setUploading(true);
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    try {
+      const res = await fetch(`${backendUrl}/api/auth/profile/avatar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Failed to upload avatar.');
+      } else {
+        setSuccess('Profile image updated successfully!');
+        if (data.user && onUserUpdate) {
+          onUserUpdate(data.user);
+        }
+      }
+    } catch (err) {
+      console.error('Error uploading avatar:', err);
+      setError('Network error. Failed to upload avatar.');
+    } finally {
+      setUploading(false);
+      // Reset input value so same file can be uploaded again if needed
+      if (e.target) e.target.value = '';
+    }
+  };
+
   return (
-    <div className="settings-panel card" style={{ margin: '32px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
-        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '20px', fontWeight: '700' }}>Account Settings</h2>
-        <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>View and manage your account configurations</p>
+    <div className="settings-panel card" style={{ margin: '32px', display: 'flex', flexDirection: 'column', gap: '28px', maxWidth: '650px' }}>
+      <div style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '16px' }}>
+        <h2 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', fontWeight: '700' }}>Account Settings</h2>
+        <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>View and manage your account configurations & profile photo</p>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', alignItems: 'center' }}>
+      {/* Avatar Upload Section */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '24px', padding: '16px', backgroundColor: 'var(--bg-tertiary)', borderRadius: '16px', border: '1px dashed var(--border-color)' }}>
+        <div 
+          onClick={handleAvatarClick}
+          style={{ 
+            position: 'relative', 
+            width: '90px', 
+            height: '90px', 
+            borderRadius: '50%', 
+            cursor: 'pointer', 
+            overflow: 'hidden', 
+            backgroundColor: 'var(--primary-light)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            border: '2px solid var(--primary-color)',
+            boxShadow: '0 8px 16px rgba(0, 0, 0, 0.1)',
+            transition: 'transform 0.2s'
+          }}
+          className="avatar-container-wrapper"
+        >
+          {user.avatar_url ? (
+            <img src={user.avatar_url} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <span style={{ fontSize: '32px', fontWeight: '700', color: 'var(--primary-color)' }}>
+              {user.name?.charAt(0).toUpperCase() || 'U'}
+            </span>
+          )}
+
+          {/* Hover overlay */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'rgba(0, 0, 0, 0.55)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            opacity: 0,
+            transition: 'opacity 0.2s',
+            color: 'white',
+            fontSize: '10px',
+            fontWeight: '600'
+          }}
+          className="avatar-hover-overlay"
+          >
+            <Camera size={18} style={{ marginBottom: '4px' }} />
+            <span>CHANGE</span>
+          </div>
+        </div>
+
+        <div style={{ flex: 1 }}>
+          <h4 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '4px' }}>Profile Avatar</h4>
+          <p style={{ fontSize: '12px', color: 'var(--text-muted)', lineHeight: '1.4', marginBottom: '12px' }}>
+            Upload a high-quality square image (PNG, JPG, GIF or WEBP). Maximum file size is 5MB.
+          </p>
+          
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleFileChange} 
+            style={{ display: 'none' }} 
+            accept="image/*"
+          />
+
+          <button 
+            type="button" 
+            className="btn btn-primary btn-sm" 
+            onClick={handleAvatarClick}
+            disabled={uploading}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', fontSize: '12px' }}
+          >
+            {uploading ? (
+              <>
+                <span className="spinner-mini"></span>
+                <span>Uploading...</span>
+              </>
+            ) : (
+              <>
+                <Upload size={14} />
+                <span>Upload New Photo</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', backgroundColor: 'var(--error-light)', color: 'var(--error)', borderRadius: '12px', fontSize: '13px', border: '1px solid rgba(239, 68, 68, 0.15)' }}>
+          <AlertCircle size={16} />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {success && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 16px', backgroundColor: 'var(--success-light)', color: 'var(--success)', borderRadius: '12px', fontSize: '13px', border: '1px solid rgba(16, 185, 129, 0.15)' }}>
+          <CheckCheck size={16} />
+          <span>{success}</span>
+        </div>
+      )}
+
+      {/* Profile Fields */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
           <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)' }}>Full Name</span>
           <span style={{ fontSize: '14px', fontWeight: '700' }}>{user.name}</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', alignItems: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
           <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)' }}>Email Address</span>
           <span style={{ fontSize: '14px', fontWeight: '700' }}>{user.email}</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', alignItems: 'center' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '10px' }}>
           <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)' }}>Account Role</span>
-          <span style={{ display: 'inline-flex' }}><span className="badge badge-secondary">{user.role}</span></span>
+          <span style={{ display: 'inline-flex' }}><span className="badge badge-secondary" style={{ textTransform: 'capitalize' }}>{user.role === 'md' ? 'Managing Director' : 'Employee'}</span></span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '150px 1fr', alignItems: 'center' }}>
-          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)' }}>System Type</span>
-          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Supabase pgvector / SQLite auto-adaptive</span>
+          <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)' }}>Storage Bucket</span>
+          <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Supabase Storage: /avatars</span>
         </div>
       </div>
 
-      <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
-        <button className="btn btn-secondary" onClick={onLogout} style={{ borderColor: 'var(--error)', color: 'var(--error)' }}>
+      <div style={{ marginTop: '16px', borderTop: '1px solid var(--border-color)', paddingTop: '20px' }}>
+        <button className="btn btn-secondary" onClick={onLogout} style={{ borderColor: 'var(--error)', color: 'var(--error)', padding: '10px 20px', fontSize: '13px', fontWeight: '600' }}>
           Log Out Profile
         </button>
       </div>
+
+      <style>{`
+        /* Hover overlay styling */
+        .avatar-container-wrapper:hover .avatar-hover-overlay {
+          opacity: 1 !important;
+        }
+        .avatar-container-wrapper:hover {
+          transform: scale(1.03);
+        }
+
+        /* Tiny custom spinner */
+        .spinner-mini {
+          width: 14px;
+          height: 14px;
+          border: 2px solid rgba(255, 255, 255, 0.3);
+          border-top-color: white;
+          border-radius: 50%;
+          animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }

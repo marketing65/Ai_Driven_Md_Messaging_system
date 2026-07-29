@@ -482,6 +482,9 @@ export async function initializeDatabase() {
 
   // Create allowed_emails table
   await ensureAllowedEmailsTable();
+
+  // Create avatar_url column in users table
+  await ensureAvatarUrlColumn();
 }
 
 // ──────────────────────────────────────────────────────────────────
@@ -618,5 +621,38 @@ async function repairEmbeddings() {
     console.log(`[DB] ✓ All ${rows.length} embeddings refreshed`);
   } catch (err) {
     console.warn('[DB] Embedding repair failed (non-fatal):', err.message);
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────
+// Create avatar_url column in users table if not exists
+// ──────────────────────────────────────────────────────────────────
+async function ensureAvatarUrlColumn() {
+  const { Client } = pg;
+  const client = new Client({
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+  });
+  try {
+    await client.connect();
+    const colExistsRes = await client.query(`
+      SELECT column_name 
+      FROM information_schema.columns 
+      WHERE table_name='users' AND column_name='avatar_url';
+    `);
+    
+    if (colExistsRes.rows.length === 0) {
+      console.log('[DB] Adding avatar_url column to users table...');
+      await client.query(`
+        ALTER TABLE users ADD COLUMN avatar_url TEXT;
+      `);
+      console.log('[DB] ✓ avatar_url column added successfully');
+    } else {
+      console.log('[DB] ✓ users.avatar_url column already exists');
+    }
+  } catch (err) {
+    console.error('[DB] Error checking/adding avatar_url column:', err.message);
+  } finally {
+    await client.end();
   }
 }
