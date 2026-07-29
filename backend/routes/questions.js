@@ -52,9 +52,6 @@ router.get('/', authenticateToken, async (req, res) => {
   if (role !== 'md') {
     queryText += ` AND q.user_id = $${paramIndex++}`;
     params.push(userId);
-  } else {
-    // MD should only see questions raised by employees, not their own broadcasted/directed questions
-    queryText += " AND q.question_original NOT LIKE '[MD_QUESTION_%'";
   }
 
   if (status) {
@@ -72,7 +69,11 @@ router.get('/', authenticateToken, async (req, res) => {
 
   try {
     const result = await query(queryText, params);
-    res.json(result.rows);
+    let rows = result.rows || [];
+    if (role === 'md') {
+      rows = rows.filter(q => !q.question_original.startsWith('[MD_QUESTION_'));
+    }
+    res.json(rows);
   } catch (err) {
     console.error('Fetch questions error:', err.message);
     res.status(500).json({ error: 'Failed to retrieve questions' });

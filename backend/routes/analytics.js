@@ -12,8 +12,8 @@ router.get('/summary', authenticateToken, async (req, res) => {
     const usersRes = await query('SELECT id, name, role, email FROM users');
     const dbUsers = usersRes.rows || [];
 
-    const questionsRes = await query("SELECT id, user_id, question_original, answer, status, priority, created_at, answered_at FROM questions WHERE question_original NOT LIKE '[MD_QUESTION_%'");
-    const dbQuestions = questionsRes.rows || [];
+    const questionsRes = await query("SELECT id, user_id, question_original, answer, status, priority, created_at, answered_at FROM questions");
+    const dbQuestions = (questionsRes.rows || []).filter(q => !q.question_original.startsWith('[MD_QUESTION_'));
 
     const kbRes = await query('SELECT count(*) as count FROM knowledge_base');
     const kbCount = parseInt(kbRes.rows[0].count || 0);
