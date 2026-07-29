@@ -52,6 +52,9 @@ router.get('/', authenticateToken, async (req, res) => {
   if (role !== 'md') {
     queryText += ` AND q.user_id = $${paramIndex++}`;
     params.push(userId);
+  } else {
+    // MD should only see questions raised by employees, not their own broadcasted/directed questions
+    queryText += " AND q.question_original NOT LIKE '[MD_QUESTION_%'";
   }
 
   if (status) {
