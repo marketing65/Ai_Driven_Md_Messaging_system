@@ -395,6 +395,47 @@ router.get('/broadcast-questions', authenticateToken, async (req, res) => {
   }
 });
 
+// ── DELETE /api/chat/broadcast/:id ──────────────────────────────────
+router.delete('/broadcast/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  const role = req.user.role;
+
+  if (role !== 'md') {
+    return res.status(403).json({ error: 'Only MD can delete broadcast questions' });
+  }
+
+  try {
+    // 1. Verify if the question exists and is a broadcast question
+    const qRes = await query('SELECT question_original FROM questions WHERE id = $1', [id]);
+    if (qRes.rows.length === 0) {
+      return res.status(404).json({ error: 'Question not found' });
+    }
+
+    const questionText = qRes.rows[0].question_original;
+    if (!questionText.startsWith('[MD_QUESTION_TO_ALL]')) {
+      return res.status(400).json({ error: 'This question is not a broadcast question' });
+    }
+
+    // 2. Delete discussion thread messages
+    const threadChatId = `md-broadcast-${id}`;
+    await query('DELETE FROM messages WHERE chat_id = $1', [threadChatId]);
+
+    // 3. Delete the question itself
+    await query('DELETE FROM questions WHERE id = $1', [id]);
+
+    // 4. Emit live socket event to notify all users to remove this broadcast
+    const io = req.app.get('socketio');
+    if (io) {
+      io.emit('broadcast_deleted', { id });
+    }
+
+    res.json({ message: 'Broadcast question and all discussion history deleted successfully' });
+  } catch (err) {
+    console.error('Delete broadcast error:', err.message);
+    res.status(500).json({ error: 'Failed to delete broadcast question' });
+  }
+});
+
 // ── POST /api/chat/md-ask ──────────────────────────────────────────
 router.post('/md-ask', authenticateToken, async (req, res) => {
   const { message, recipient } = req.body;

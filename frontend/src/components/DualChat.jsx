@@ -73,6 +73,29 @@ export default function DualChat({ user, backendUrl, token }) {
     }
   };
 
+  const handleDeleteBroadcast = async (qId) => {
+    if (!window.confirm("Are you sure you want to delete this broadcast question and all of its discussion logs?")) return;
+
+    try {
+      const res = await fetch(`${backendUrl}/api/chat/broadcast/${qId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        setBroadcastQuestions(prev => prev.filter(q => q.id !== qId));
+        if (activeThread && activeThread.id === qId) {
+          setActiveThread(null);
+        }
+      } else {
+        alert("Failed to delete broadcast question.");
+      }
+    } catch (err) {
+      console.error("Error deleting broadcast:", err);
+    }
+  };
+
   const [recipient, setRecipient] = useState('all'); // 'all' or specific employee user.id
   const [broadcastQuestions, setBroadcastQuestions] = useState([]);
   const [activeThread, setActiveThread] = useState(null); // Currently opened broadcast question thread
@@ -291,6 +314,16 @@ export default function DualChat({ user, backendUrl, token }) {
 
     socketRef.current.on('new_broadcast_question', (question) => {
       setBroadcastQuestions(prev => [question, ...prev]);
+    });
+
+    socketRef.current.on('broadcast_deleted', ({ id }) => {
+      setBroadcastQuestions(prev => prev.filter(q => q.id !== id));
+      setActiveThread(current => {
+        if (current && current.id === id) {
+          return null;
+        }
+        return current;
+      });
     });
 
     socketRef.current.on('new_broadcast_message', (msg) => {
@@ -1066,7 +1099,19 @@ export default function DualChat({ user, backendUrl, token }) {
                         <div className="broadcast-q-card-md" key={q.id} onClick={() => setActiveThread(q)}>
                           <div className="q-card-header">
                             <span className="badge badge-pending">Active Thread</span>
-                            <span className="q-date">{new Date(q.created_at).toLocaleDateString()}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span className="q-date">{new Date(q.created_at).toLocaleDateString()}</span>
+                              <button 
+                                className="delete-broadcast-btn"
+                                onClick={(e) => {
+                                  e.stopPropagation(); // prevent opening thread
+                                  handleDeleteBroadcast(q.id);
+                                }}
+                                title="Delete Broadcast Question"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
                           </div>
                           <p className="q-text">{q.question_original.replace('[MD_QUESTION_TO_ALL] ', '')}</p>
                           <div className="q-card-footer">
@@ -1823,6 +1868,23 @@ export default function DualChat({ user, backendUrl, token }) {
           color: var(--text-muted);
           font-size: 12px;
           padding: 20px;
+        }
+
+        .delete-broadcast-btn {
+          padding: 4px;
+          color: var(--text-muted);
+          transition: color 0.2s, transform 0.2s;
+          cursor: pointer;
+          border: none;
+          background: transparent;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+
+        .delete-broadcast-btn:hover {
+          color: var(--error) !important;
+          transform: scale(1.15);
         }
 
         /* Input Form */
