@@ -32,8 +32,8 @@ app.set('trust proxy', 1);
 const server = http.createServer(app);
 
 // Safe CORS Origins Configuration
-const allowedOrigins = process.env.FRONTEND_URL 
-  ? process.env.FRONTEND_URL.split(',') 
+const allowedOrigins = process.env.FRONTEND_URL
+  ? process.env.FRONTEND_URL.split(',')
   : ['http://localhost:5173', 'http://127.0.0.1:5173'];
 
 const corsOptions = {
