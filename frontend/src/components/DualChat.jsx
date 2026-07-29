@@ -89,8 +89,19 @@ export default function DualChat({ user, backendUrl, token }) {
           setActiveThread(null);
         }
       } else {
-        const errorData = await res.json().catch(() => ({}));
-        alert(`Failed to delete broadcast question: ${errorData.error || res.statusText || 'Unknown error'}`);
+        const errorText = await res.text().catch(() => '');
+        let errorMsg = 'Unknown error';
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMsg = errorData.error || errorMsg;
+        } catch (_) {
+          if (errorText) {
+            errorMsg = errorText.length > 120 ? `${errorText.substring(0, 120)}...` : errorText;
+          } else {
+            errorMsg = res.statusText || `Status code: ${res.status}`;
+          }
+        }
+        alert(`Failed to delete broadcast question: ${errorMsg}`);
       }
     } catch (err) {
       console.error("Error deleting broadcast:", err);
