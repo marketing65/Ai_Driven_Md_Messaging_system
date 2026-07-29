@@ -72,14 +72,8 @@ export default function Sidebar({
 
       <div className="sidebar-footer">
         <div className="user-profile-card">
-          <div className="user-avatar" style={{ overflow: 'hidden' }}>
-            {user?.avatar_url ? (
-              <img src={user.avatar_url} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : user?.role === 'md' ? (
-              <img src="/md-avatar.png" alt="MD" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : (
-              user?.name?.charAt(0) || 'U'
-            )}
+          <div className="user-avatar" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--primary-light)', color: 'var(--primary-color)', fontWeight: 'bold', fontSize: '16px' }}>
+            {user?.name?.charAt(0).toUpperCase() || 'U'}
           </div>
           <div className="user-info">
             <h4>{user?.name || 'Guest'}</h4>

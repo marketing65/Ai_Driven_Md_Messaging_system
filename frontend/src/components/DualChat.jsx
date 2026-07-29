@@ -920,13 +920,9 @@ export default function DualChat({ user, backendUrl, token }) {
           ) : (
             aiHistory.map((msg, index) => (
               <div key={index} className={`message-bubble-row ${msg.sender}`}>
-                <div className="msg-avatar" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div className="msg-avatar" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: msg.sender === 'employee' ? 'var(--primary-light)' : 'var(--bg-tertiary)', color: msg.sender === 'employee' ? 'var(--primary-color)' : 'var(--text-primary)', fontWeight: 'bold' }}>
                   {msg.sender === 'employee' ? (
-                    user.avatar_url ? (
-                      <img src={user.avatar_url} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <User size={16} />
-                    )
+                    user.name?.charAt(0).toUpperCase() || 'U'
                   ) : (
                     <Bot size={16} />
                   )}
@@ -1028,22 +1024,18 @@ export default function DualChat({ user, backendUrl, token }) {
       <div className="chat-pane md-chat-pane" style={{ flexGrow: 1, flexShrink: 1, width: 0 }}>
         <div className="chat-pane-header">
           <div className="header-meta">
-            <div className="md-avatar-wrapper" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div className="md-avatar-wrapper" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--primary-light)', color: 'var(--primary-color)', fontWeight: 'bold', borderRadius: '50%' }}>
               {user.role === 'md' ? (
                 (() => {
                   const activeEmployee = employees.find(emp => emp.id === recipient);
-                  return activeEmployee?.avatar_url ? (
-                    <img src={activeEmployee.avatar_url} alt="Employee" className="md-avatar-circle" />
+                  return activeEmployee ? (
+                    activeEmployee.name?.charAt(0).toUpperCase()
                   ) : (
                     <Users size={20} />
                   );
                 })()
               ) : (
-                mdProfile?.avatar_url ? (
-                  <img src={mdProfile.avatar_url} alt="MD" className="md-avatar-circle" />
-                ) : (
-                  <img src="/md-avatar.png" alt="MD" className="md-avatar-circle" />
-                )
+                mdProfile?.name?.charAt(0).toUpperCase() || 'M'
               )}
             </div>
             <div>
@@ -1159,32 +1151,21 @@ export default function DualChat({ user, backendUrl, token }) {
               ) : (
                 threadHistory.map((msg, index) => (
                   <div key={index} className={`message-bubble-row ${msg.sender}`}>
-                    <div className="msg-avatar" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div className="msg-avatar" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: msg.message.startsWith('Managing Director') ? 'var(--primary-light)' : 'var(--bg-tertiary)', color: msg.message.startsWith('Managing Director') ? 'var(--primary-color)' : 'var(--text-primary)', fontWeight: 'bold' }}>
                       {msg.message.startsWith('Managing Director') ? (
                         user.role === 'md' ? (
-                          user.avatar_url ? (
-                            <img src={user.avatar_url} alt="MD" className="md-avatar-mini" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          ) : (
-                            <img src="/md-avatar.png" alt="MD" className="md-avatar-mini" />
-                          )
+                          user.name?.charAt(0).toUpperCase() || 'M'
                         ) : (
-                          mdProfile?.avatar_url ? (
-                            <img src={mdProfile.avatar_url} alt="MD" className="md-avatar-mini" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          ) : (
-                            <img src="/md-avatar.png" alt="MD" className="md-avatar-mini" />
-                          )
+                          mdProfile?.name?.charAt(0).toUpperCase() || 'M'
                         )
                       ) : (
                         (() => {
                           const prefixIndex = msg.message.indexOf(': ');
                           if (prefixIndex !== -1) {
                             const senderName = msg.message.substring(0, prefixIndex);
-                            const senderEmp = employees.find(emp => emp.name === senderName);
-                            if (senderEmp?.avatar_url) {
-                              return <img src={senderEmp.avatar_url} alt={senderName} className="md-avatar-mini" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />;
-                            }
+                            return senderName.charAt(0).toUpperCase();
                           }
-                          return <User size={16} />;
+                          return 'U';
                         })()
                       )}
                     </div>
@@ -1377,7 +1358,9 @@ export default function DualChat({ user, backendUrl, token }) {
                       </>
                     ) : (
                       <>
-                        <img src="/md-avatar.png" alt="Managing Director" className="md-avatar-welcome" />
+                        <div className="md-avatar-welcome" style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: 'var(--primary-light)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', fontWeight: 'bold', margin: '0 auto 16px' }}>
+                          M
+                        </div>
                         <h4>Submit Direct Ticket to Managing Director</h4>
                         <p>Your question will be added to the MD's dashboard queue. MD replies will update the company knowledge base.</p>
                         <div className="suggestion-pill-box">
@@ -1389,37 +1372,21 @@ export default function DualChat({ user, backendUrl, token }) {
                 ) : (
                   mdHistory.map((msg, index) => (
                     <div key={index} className={`message-bubble-row ${msg.sender}`}>
-                      <div className="msg-avatar" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div className="msg-avatar" style={{ overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: msg.sender === 'md' ? 'var(--primary-light)' : 'var(--bg-tertiary)', color: msg.sender === 'md' ? 'var(--primary-color)' : 'var(--text-primary)', fontWeight: 'bold' }}>
                         {msg.sender === 'md' ? (
                           user.role === 'md' ? (
-                            user.avatar_url ? (
-                              <img src={user.avatar_url} alt="MD" className="md-avatar-mini" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                              <img src="/md-avatar.png" alt="MD" className="md-avatar-mini" />
-                            )
+                            user.name?.charAt(0).toUpperCase() || 'M'
                           ) : (
-                            mdProfile?.avatar_url ? (
-                              <img src={mdProfile.avatar_url} alt="MD" className="md-avatar-mini" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                              <img src="/md-avatar.png" alt="MD" className="md-avatar-mini" />
-                            )
+                            mdProfile?.name?.charAt(0).toUpperCase() || 'M'
                           )
                         ) : (
                           user.role === 'md' ? (
                             (() => {
                               const activeEmployee = employees.find(emp => emp.id === recipient);
-                              return activeEmployee?.avatar_url ? (
-                                <img src={activeEmployee.avatar_url} alt="Employee" className="md-avatar-mini" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              ) : (
-                                <User size={16} />
-                              );
+                              return activeEmployee ? activeEmployee.name?.charAt(0).toUpperCase() : 'E';
                             })()
                           ) : (
-                            user.avatar_url ? (
-                              <img src={user.avatar_url} alt="Employee" className="md-avatar-mini" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            ) : (
-                              <User size={16} />
-                            )
+                            user.name?.charAt(0).toUpperCase() || 'E'
                           )
                         )}
                       </div>

@@ -650,6 +650,10 @@ async function ensureAvatarUrlColumn() {
     } else {
       console.log('[DB] ✓ users.avatar_url column already exists');
     }
+
+    // Force PostgREST schema cache reload so Supabase API detects the new column
+    await client.query("NOTIFY pgrst, 'reload schema';");
+    console.log("[DB] ✓ Sent schema reload notification to PostgREST");
   } catch (err) {
     console.error('[DB] Error checking/adding avatar_url column:', err.message);
   } finally {
