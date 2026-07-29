@@ -405,23 +405,39 @@ router.delete('/broadcast/:id', authenticateToken, async (req, res) => {
   }
 
   try {
-    // 1. Verify if the question exists and is a broadcast question
-    const qRes = await query('SELECT question_original FROM questions WHERE id = $1', [id]);
-    if (qRes.rows.length === 0) {
+    // 1. Verify if the question exists and is a broadcast question using Supabase client
+    const { data: questionData, error: selectError } = await supabase
+      .from('questions')
+      .select('question_original')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (selectError) throw selectError;
+    if (!questionData) {
       return res.status(404).json({ error: 'Question not found' });
     }
 
-    const questionText = qRes.rows[0].question_original;
+    const questionText = questionData.question_original;
     if (!questionText.startsWith('[MD_QUESTION_TO_ALL]')) {
       return res.status(400).json({ error: 'This question is not a broadcast question' });
     }
 
-    // 2. Delete discussion thread messages
+    // 2. Delete discussion thread messages using Supabase client
     const threadChatId = `md-broadcast-${id}`;
-    await query('DELETE FROM messages WHERE chat_id = $1', [threadChatId]);
+    const { error: deleteMessagesError } = await supabase
+      .from('messages')
+      .delete()
+      .eq('chat_id', threadChatId);
 
-    // 3. Delete the question itself
-    await query('DELETE FROM questions WHERE id = $1', [id]);
+    if (deleteMessagesError) throw deleteMessagesError;
+
+    // 3. Delete the question itself using Supabase client
+    const { error: deleteQuestionError } = await supabase
+      .from('questions')
+      .delete()
+      .eq('id', id);
+
+    if (deleteQuestionError) throw deleteQuestionError;
 
     // 4. Emit live socket event to notify all users to remove this broadcast
     const io = req.app.get('socketio');
@@ -432,7 +448,7 @@ router.delete('/broadcast/:id', authenticateToken, async (req, res) => {
     res.json({ message: 'Broadcast question and all discussion history deleted successfully' });
   } catch (err) {
     console.error('Delete broadcast error:', err.message);
-    res.status(500).json({ error: 'Failed to delete broadcast question' });
+    res.status(500).json({ error: `Failed to delete broadcast question: ${err.message}` });
   }
 });
 

@@ -89,10 +89,12 @@ export default function DualChat({ user, backendUrl, token }) {
           setActiveThread(null);
         }
       } else {
-        alert("Failed to delete broadcast question.");
+        const errorData = await res.json().catch(() => ({}));
+        alert(`Failed to delete broadcast question: ${errorData.error || res.statusText || 'Unknown error'}`);
       }
     } catch (err) {
       console.error("Error deleting broadcast:", err);
+      alert(`Connection error: ${err.message}`);
     }
   };
 
