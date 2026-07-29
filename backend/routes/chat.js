@@ -452,6 +452,39 @@ router.delete('/broadcast/:id', authenticateToken, async (req, res) => {
   }
 });
 
+// ── DELETE /api/chat/clear/:chatId ──────────────────────────────────
+router.delete('/clear/:chatId', authenticateToken, async (req, res) => {
+  const { chatId } = req.params;
+  const userId = req.user.id;
+  const role = req.user.role;
+
+  // Security check:
+  // Employees can only clear their own chats (ai-<userId> or md-<userId>)
+  // MD can clear any chat
+  if (role !== 'md' && !chatId.includes(userId)) {
+    return res.status(403).json({ error: 'Unauthorized to clear this chat history' });
+  }
+
+  try {
+    const { error: deleteError } = await supabase
+      .from('messages')
+      .delete()
+      .eq('chat_id', chatId);
+
+    if (deleteError) throw deleteError;
+
+    const io = req.app.get('socketio');
+    if (io) {
+      io.to(chatId).emit('chat_cleared', { chatId });
+    }
+
+    res.json({ message: 'Chat history cleared successfully', chatId });
+  } catch (err) {
+    console.error('Clear chat error:', err.message);
+    res.status(500).json({ error: `Failed to clear chat history: ${err.message}` });
+  }
+});
+
 // ── POST /api/chat/md-ask ──────────────────────────────────────────
 router.post('/md-ask', authenticateToken, async (req, res) => {
   const { message, recipient } = req.body;

@@ -13,6 +13,69 @@ export default function DualChat({ user, backendUrl, token }) {
   const [mdLoading, setMdLoading] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState([]);
   const [activeViewerFile, setActiveViewerFile] = useState(null);
+
+  const [showLeftMenu, setShowLeftMenu] = useState(false);
+  const [showRightMenu, setShowRightMenu] = useState(false);
+  const leftMenuRef = useRef(null);
+  const rightMenuRef = useRef(null);
+
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (leftMenuRef.current && !leftMenuRef.current.contains(e.target)) {
+        setShowLeftMenu(false);
+      }
+      if (rightMenuRef.current && !rightMenuRef.current.contains(e.target)) {
+        setShowRightMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  const handleClearChat = async (chatType) => {
+    let targetChatId = '';
+    let confirmMsg = '';
+
+    if (chatType === 'ai') {
+      targetChatId = aiChatId;
+      confirmMsg = "Are you sure you want to clear your AI chat history?";
+    } else if (chatType === 'md') {
+      const currentMdChatId = user.role === 'md'
+        ? (recipient === 'all' ? null : `md-${recipient}`)
+        : mdChatId;
+      
+      if (!currentMdChatId) {
+        alert("No active chat to clear.");
+        return;
+      }
+      targetChatId = currentMdChatId;
+      confirmMsg = "Are you sure you want to clear this MD/Employee chat history?";
+    }
+
+    if (!targetChatId) return;
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      const res = await fetch(`${backendUrl}/api/chat/clear/${targetChatId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        if (chatType === 'ai') {
+          setAiHistory([]);
+        } else if (chatType === 'md') {
+          setMdHistory([]);
+        }
+      } else {
+        const errorText = await res.text();
+        alert(`Failed to clear chat: ${errorText || res.statusText}`);
+      }
+    } catch (err) {
+      console.error("Error clearing chat:", err);
+      alert("Error clearing chat history");
+    }
+  };
   
   // Voice Recording state
   const [recordingLeft, setRecordingLeft] = useState(false);
@@ -342,6 +405,21 @@ export default function DualChat({ user, backendUrl, token }) {
     socketRef.current.on('new_broadcast_message', (msg) => {
       if (activeThread && msg.chat_id === `md-broadcast-${activeThread.id}`) {
         setThreadHistory(prev => [...prev, msg]);
+      }
+    });
+
+    socketRef.current.on('chat_cleared', ({ chatId }) => {
+      if (chatId === aiChatId) {
+        setAiHistory([]);
+      } else {
+        const currentMdChatId = user.role === 'md'
+          ? (recipient === 'all' ? null : `md-${recipient}`)
+          : mdChatId;
+        if (chatId === currentMdChatId) {
+          setMdHistory([]);
+        } else if (activeThread && chatId === `md-broadcast-${activeThread.id}`) {
+          setThreadHistory([]);
+        }
       }
     });
 
@@ -769,9 +847,51 @@ export default function DualChat({ user, backendUrl, token }) {
               </div>
             </div>
           </div>
-          <button className="btn-icon header-more-btn">
-            <MoreHorizontal size={18} />
-          </button>
+          <div className="header-menu-container" ref={leftMenuRef} style={{ position: 'relative' }}>
+            <button className="btn-icon header-more-btn" onClick={() => setShowLeftMenu(!showLeftMenu)} title="Chat options">
+              <MoreHorizontal size={18} />
+            </button>
+            {showLeftMenu && (
+              <div className="header-dropdown-menu" style={{
+                position: 'absolute',
+                right: 0,
+                top: '45px',
+                backgroundColor: 'var(--bg-secondary)',
+                border: '1px solid var(--border-color)',
+                borderRadius: '8px',
+                boxShadow: 'var(--shadow-md)',
+                zIndex: 100,
+                minWidth: '120px',
+                padding: '6px 0',
+                display: 'flex',
+                flexDirection: 'column'
+              }}>
+                <button 
+                  type="button"
+                  onClick={() => { handleClearChat('ai'); setShowLeftMenu(false); }}
+                  className="dropdown-item-btn"
+                  style={{
+                    padding: '8px 16px',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-primary)',
+                    textAlign: 'left',
+                    fontSize: '13px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    width: '100%'
+                  }}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--bg-tertiary)'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                >
+                  <Trash2 size={14} style={{ color: 'var(--error)' }} />
+                  <span>Clear Chat</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="chat-messages-container">
@@ -922,9 +1042,53 @@ export default function DualChat({ user, backendUrl, token }) {
             </div>
           )}
 
-          <button className="btn-icon header-more-btn">
-            <MoreHorizontal size={18} />
-          </button>
+          {(user.role !== 'md' || recipient !== 'all') && (
+            <div className="header-menu-container" ref={rightMenuRef} style={{ position: 'relative' }}>
+              <button className="btn-icon header-more-btn" onClick={() => setShowRightMenu(!showRightMenu)} title="Chat options">
+                <MoreHorizontal size={18} />
+              </button>
+              {showRightMenu && (
+                <div className="header-dropdown-menu" style={{
+                  position: 'absolute',
+                  right: 0,
+                  top: '45px',
+                  backgroundColor: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '8px',
+                  boxShadow: 'var(--shadow-md)',
+                  zIndex: 100,
+                  minWidth: '120px',
+                  padding: '6px 0',
+                  display: 'flex',
+                  flexDirection: 'column'
+                }}>
+                  <button 
+                    type="button"
+                    onClick={() => { handleClearChat('md'); setShowRightMenu(false); }}
+                    className="dropdown-item-btn"
+                    style={{
+                      padding: '8px 16px',
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--text-primary)',
+                      textAlign: 'left',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      width: '100%'
+                    }}
+                    onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--bg-tertiary)'}
+                    onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  >
+                    <Trash2 size={14} style={{ color: 'var(--error)' }} />
+                    <span>Clear Chat</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ── BROADCAST GROUP DISCUSSION THREAD VIEW ── */}
