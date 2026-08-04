@@ -210,8 +210,8 @@ erDiagram
         uuid user_id FK
         text question_original
         text answer
-        varchar status "pending | answered"
-        varchar priority "low | medium | high"
+        varchar status
+        varchar priority
         timestamp created_at
         timestamp answered_at
     }
@@ -219,18 +219,18 @@ erDiagram
         integer id PK
         text question
         text answer
-        vector embedding "1536 dimensions"
+        vector embedding
     }
     MESSAGES {
         uuid id PK
-        varchar chat_id "direct_chat | broadcast"
-        varchar sender "employee | md"
+        varchar chat_id
+        varchar sender
         text message
         timestamp created_at
     }
     ALLOWED_EMAILS {
         uuid id PK
-        varchar email UNIQUE
+        varchar email
         timestamp created_at
     }
 
